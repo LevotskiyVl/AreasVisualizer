@@ -26,3 +26,17 @@
 *.exe
 *.out
 *.app
+
+build-RefactoringTest-Desktop_Qt_5_10_0_GCC_64bit-Debug/
+
+build-RefactoringTest-Desktop_Qt_5_5_1_MinGW_32bit-Debug/
+
+build-RefactoringTest-Desktop_Qt_5_5_1_MinGW_32bit-Release/
+
+*.autosave
+
+*.pro
+
+*.user
+
+*.365fc18
