@@ -1,23 +1,9 @@
 #include "motion.h"
 #include "image_transofrms/transofrms.h"
 #include <string.h>
+#include "settings.h"
 
-#define GRID_SIZE 16;
-#define GRID_ELMTS_FOR_OBJ 30
-#define SUBTRACTION_DELTA 15
-#define GRIDS_CELL_FILTRATION_THRESH 0.20f
-#define SUBTRACTION_DELTA_FX2 20
-#define GRIDS_CELL_FILTRATION_THRESH_FX2 0.125f
-#define GRIDS_CELL_FILTRATION_THRESH_FX4 0.028f
-#define GRIDS_MASK_SIZE 4
-#define REDUCE_X 4
-#define REDUICE_Y 4
-#define BACKGROUND_UPDATING_DELAY 15
-#define BACKGROUND_UPDATING_RATE 1
-#define MM_MORPH_WIDTH 3
-#define MM_MORPH_HEIGHT 3
 
-static uint16_t* calculateHistogram(const ByteImage* image, const MotionDetectorSettings* settings, ByteImage* background);
 
 struct GlobalVariables{
     ByteImage reducedImage;
@@ -33,7 +19,7 @@ struct GlobalVariables{
 
 static GlobalVariables globalVariables;
 
-int motionDetector(const ByteImage* image, MotionAreaArray** motinAreasArray)
+int motionDetector(const ByteImage* image, MotionAreaArray** motionAreasArray)
 {
     if (image == NULL) return NULL_PTR_ERROR;
     if (image->width != globalVariables.backgroundModel.width ||
@@ -54,7 +40,20 @@ int motionDetector(const ByteImage* image, MotionAreaArray** motinAreasArray)
     }
 
     uint16_t* histogram = calculateHistogram(&globalVariables.gaussImage, &globalVariables.settings, &globalVariables.backgroundModel);
+
+    uint16_t mapHeight = globalVariables.reducedImage.height / settings->gridMaskSize;
+    uint16_t mapWidth = globalVariables.reducedImage.width / settings->gridMaskSize;
+    if (mapWidth * settings->gridMaskSize != globalVariables.reducedImage.width) mapWidth++;
+    if (mapHeight * settings->gridMaskSize != globalVariables.reducedImage.height) mapHeight++;
     ByteImage map;
+    initByteImage(mapWidth, mapHeight, 1, &map);
+
+    createMotionMap(histogram, settings, &map);
+    //TODO: маркировка карты двжиеня
+    //TODO: преобразование результатов маркировки в MotionAreaArray
+    *motionAreasArray = motionFilter(motionFrames, settings);
+    //TODO: масштабирование рамок к оригинальному изображению
+    return 0;
 
 }
 
@@ -107,7 +106,8 @@ int initMovementDetector(const ByteImage* sourceImage, MotionDetectorSettings* s
         globalVariables.histogramHeight++;
     }
 
-    globalVariables.histogram = (uint16_t*)calloc(histogramWidth * histogramHeight, sizeof(uint16_t));
+    globalVariables.histogram = (uint16_t*)calloc(globalVariables.histogramWidth *
+                                                  globalVariables.histogramHeight, sizeof(uint16_t));
     if (globalVariables.histogram == NULL) { return ALLOCATION_ERROR; }
 
     wasInitialized = true;
@@ -123,12 +123,12 @@ void release_movement(){
 
 }
 
-int fillMotionSettingsWithDefaultValues(MotionDetectorSettings* motionDetectorSettings)
+void fillMotionSettingsWithDefaultValues(MotionDetectorSettings* motionDetectorSettings)
 {
     motionDetectorSettings->gridMaskSize = GRIDS_MASK_SIZE;
     motionDetectorSettings->gridCellSize = GRID_SIZE;
-    motionDetectorSettings->gridWithMotionThresh = GRID_ELMTS_FOR_OBJ;
-    motionDetectorSettings->minNumberOfElementsInGrid = GRIDS_CELL_FILTRATION_THRESH_FX4;
+    motionDetectorSettings->cellWithMotionThresh = GRIDS_CELL_FILTRATION_THRESH_FX4;
+    motionDetectorSettings->minNumberOfMotionPixelsForZone = GRID_ELMTS_FOR_OBJ;
     motionDetectorSettings->reduceStepX = REDUCE_X;
     motionDetectorSettings->reduceStepY = REDUICE_Y;
     motionDetectorSettings->subtractionThreshold = SUBTRACTION_DELTA;
@@ -136,6 +136,7 @@ int fillMotionSettingsWithDefaultValues(MotionDetectorSettings* motionDetectorSe
     motionDetectorSettings->backgroundUpdatingDelay = BACKGROUND_UPDATING_DELAY;
     motionDetectorSettings->mmMorphWidth = MM_MORPH_WIDTH;
     motionDetectorSettings->mmMorphHeight = MM_MORPH_HEIGHT;
+    motionDetectorSettings->nesstingsOffsetForMotionZone = NESSTINGS_OFFSET_FOR_MOTION;
 }
 
 uint16_t* calculateHistogram(const ByteImage* image, const MotionDetectorSettings* settings, ByteImage* background)
@@ -144,7 +145,7 @@ uint16_t* calculateHistogram(const ByteImage* image, const MotionDetectorSetting
         uint32_t cellYCoord = i * settings->gridCellSize;
         uint32_t histRow = i * globalVariables.histogramWidth;
 
-        for (uint32_t j = 0; j < globalVariables->histogramWidth; j++) {
+        for (uint32_t j = 0; j < globalVariables.histogramWidth; j++) {
             uint32_t cellXCoord = j * settings->gridCellSize;
             uint32_t numberOfZone = histRow + j;
 
@@ -152,16 +153,17 @@ uint16_t* calculateHistogram(const ByteImage* image, const MotionDetectorSetting
                                                                         cellYCoord, background);
         }
     }
+    return globalVariables.histogram;
 }
 
 void createMotionMap(const uint16_t* histogram, const MotionDetectorSettings* settings, ByteImage* motionMap)
 {
     const uint16_t mask_square = settings->gridMaskSize * settings->gridMaskSize;
-    const uint16_t min_cell_size = mask_square * settings->gridWithMotionThresh;
+    const uint16_t motionPixelsThresh = mask_square * settings->cellWithMotionThresh;
     for (uint16_t i =0; i < motionMap->height; i++){
         uint16_t num_of_zone = i * motionMap->width;
         for (uint16_t j = 0; j < motionMap->width; j++){
-            if (histogram[num_of_zone + j] >= min_cell_size){
+            if (histogram[num_of_zone + j] >= motionPixelsThresh){
                 motionMap->data[num_of_zone + j] = 255;
             }
         }
@@ -169,11 +171,73 @@ void createMotionMap(const uint16_t* histogram, const MotionDetectorSettings* se
     erode(motionMap, settings->mmMorphWidth, settings->mmMorphHeight);
 }
 
-MotionAreaArray* MotionFilter(MotionAreaArray* motionAreas, uint16_t width,uint16_t height, uint8_t mask_size,uint8_t min_size)
+MotionAreaArray* motionFilter(MotionAreaArray* motionAreasArray, const MotionDetectorSettings* settings)
 {
+    uint8_t* areasForDeleting = (uint8_t*) calloc(motionAreasArray->numberOfElements, sizeof(uint8_t));
+    uint16_t numberOfDeletedAreas = 0;
+    for (size_t i = 0; i < motionAreasArray->numberOfElements; i++) {
+        bool isValid = checkMotionArea(&motionAreasArray->motionAreas[i],
+                                       settings);
+        if (isValid) {
+            isValid = checkNesting(&motionAreasArray->motionAreas[i],
+                                   motionAreasArray, areasForDeleting, settings);
+        }
+        if (!isValid) {
+            areasForDeleting[numberOfDeletedAreas] = 1;
+            numberOfDeletedAreas++;
+        }
+    }
 
+    uint16_t resultArraySize = motionAreasArray->numberOfElements - numberOfDeletedAreas;
+    MotionAreaArray* resultArray = createMotionAreaArray(resultArraySize);
+    if (resultArray == NULL) {
+        free(areasForDeleting);
+        return NULL;
+    }
+
+    fillFiltredMotionAreaArray(motionAreasArray, areasForDeleting, resultArray);
+    free(areasForDeleting);
+    return resultArray;
 }
 
+void fillFiltredMotionAreaArray(const MotionAreaArray* motionAreasArray,
+                                const uint8_t* areasForDeleting, MotionAreaArray* resultArray)
+{
+    uint16_t numberOfCopiedFrames = 0;
+    for (int i = 0; i < motionAreasArray->numberOfElements; i++) {
+        if (areasForDeleting[i] == 0) {
+            memcpy(&resultArray->motionAreas[numberOfCopiedFrames], &motionAreasArray->motionAreas[i], sizeof(MotionArea));
+        }
+    }
+}
+
+
+bool checkMotionArea(MotionArea* motionArea, const MotionDetectorSettings* settings)
+{
+    if (motionArea->numberOfMotionPixels >= settings->minNumberOfMotionPixelsForZone){
+        return true;
+    }
+    return false;
+}
+
+bool checkNesting(MotionArea* motionArea, MotionAreaArray* areas,
+                  const uint8_t* areasForDeleting, const MotionDetectorSettings* settings)
+{
+    bool returnValue = false;
+    Rect* areaRect = &motionArea->MovementRect;
+    for (size_t  i = 0; i < areas->numberOfElements; i++) {
+        if (motionArea == &areas->motionAreas[i] || areasForDeleting[i] == 1 ||
+            areas->motionAreas[i].numberOfMotionPixels < settings->minNumberOfMotionPixelsForZone) {
+            continue;
+        }
+        Rect* checkingRect = &areas->motionAreas[i].MovementRect;
+        if (isRectInside(areaRect, checkingRect, settings->nesstingsOffsetForMotionZone)){
+            returnValue = true;
+            *checkingRect = mergeRects(areaRect, checkingRect);
+        }
+    }
+    return returnValue;
+}
 
 uint16_t calculateHistCell(const ByteImage* image, const MotionDetectorSettings* settings,
                        uint16_t cellXCoord, uint16_t cellYCoord, ByteImage* background)
@@ -207,7 +271,7 @@ uint16_t calculateHistCell(const ByteImage* image, const MotionDetectorSettings*
 
             if (absDiff < settings->subtractionThreshold){
                 changesData[pixelPosition] = 0;
-                if ( !((i == 0 && m == 0) || (j == 0 && n == 0) ||
+                if ( !((cellYCoord == 0 && m == 0) || (cellXCoord == 0 && n == 0) ||
                       diffImageData[pixelPosition - 1] == 0 ||
                       diffImageData[pixelPosition - image->width] == 0 )){
 
@@ -233,5 +297,36 @@ uint16_t calculateHistCell(const ByteImage* image, const MotionDetectorSettings*
     return motionPixelsCntr;
 }
 
+MotionAreaArray* createMotionAreaArray(uint16_t numberOfElements) {
+    if (numberOfElements == 0) {
+        return NULL;
+    }
+
+    MotionAreaArray* out = (MotionAreaArray*) malloc(sizeof(MotionAreaArray));
+    if (out == NULL) {
+        return NULL;
+    }
+
+    out->motionAreas = (MotionArea*)calloc(numberOfElements, sizeof(MotionArea));
+    if (out->motionAreas == NULL) {
+        free(out);
+        return NULL;
+    }
+
+    out->numberOfElements = numberOfElements;
+    return out;
+}
+
+void releaseMotionAreaArray(MotionAreaArray** motionAreaArray) {
+    if (*motionAreaArray == NULL) {
+        return;
+    }
+
+    if ((*motionAreaArray)->motionAreas != NULL) {
+        free((*motionAreaArray)->motionAreas);
+        (*motionAreaArray)->motionAreas = NULL;
+    }
+    free(*motionAreaArray);
+}
 
 

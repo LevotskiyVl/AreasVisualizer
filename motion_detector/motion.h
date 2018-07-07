@@ -10,10 +10,9 @@
 #include "structs.h"
 #include "errors.h"
 
-
 typedef struct MotionDetectorSettings_{
     uint8_t gridCellSize;
-    uint8_t minNumberOfElementsInGrid;
+    uint8_t minNumberOfMotionPixelsForZone;
     uint8_t subtractionThreshold;
     uint8_t gridMaskSize;
     uint8_t reduceStepY;
@@ -22,11 +21,13 @@ typedef struct MotionDetectorSettings_{
     uint8_t backgroundUpdatingRate;
     uint8_t mmMorphWidth;
     uint8_t mmMorphHeight;
-    float gridWithMotionThresh;
+    uint8_t nesstingsOffsetForMotionZone;
+    float cellWithMotionThresh;
 } MotionDetectorSettings;
 
 typedef struct MotionArea_{
     Rect MovementRect;
+    uint16_t numberOfMotionPixels;
 } MotionArea;
 
 typedef struct MotionAreaArray_{
@@ -34,11 +35,24 @@ typedef struct MotionAreaArray_{
     uint16_t numberOfElements;
 } MotionAreaArray;
 
+MotionAreaArray* createMotionAreaArray(uint16_t numberOfElements);
+void releaseMotionAreaArray(MotionAreaArray**);
 int motionDetector(const ByteImage* image, MotionAreaArray*);
-static uint16_t* calculateHistogram(const ByteImage* image, const MotionDetectorSettings *settings, ByteImage* background);
-static int createMotionMap(uint16_t* histogram, ByteImage* motionMap, uint16_t mask_size, float roi_thresh);
-static int fillMotionSettingsWithDefaultValues(MotionDetectorSettings* motionArea);
-static MotionAreaArray* MotionFilter(MotionAreaArray* motionAreas, uint16_t width,uint16_t height, uint8_t mask_size,uint8_t min_size);
+
+void fillMotionSettingsWithDefaultValues(MotionDetectorSettings* motionArea);
+
+uint16_t* calculateHistogram(const ByteImage* image, const MotionDetectorSettings *settings, ByteImage* background);
+uint16_t calculateHistCell(const ByteImage* image, const MotionDetectorSettings* settings,
+                                  uint16_t cellXCoord, uint16_t cellYCoord, ByteImage* background);
+
+void createMotionMap(const uint16_t* histogram, const MotionDetectorSettings* settings, ByteImage* motionMap);
+
+MotionAreaArray* motionFilter(MotionAreaArray* motionAreasArray, const MotionDetectorSettings* settings);
+bool checkMotionArea(MotionArea* motionArea, const MotionDetectorSettings* settings);
+bool checkNesting(MotionArea* motionArea, MotionAreaArray* areas,
+                  const uint8_t* areasForDeleting, const MotionDetectorSettings *settings);
+void fillFiltredMotionAreaArray(const MotionAreaArray* motionAreasArray,
+                                const uint8_t* areasForDeleting, MotionAreaArray* resultArray);
 
 
 #endif //MOTION_H

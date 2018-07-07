@@ -49,14 +49,14 @@ typedef struct INFOHEADER_
  * @param stream указатель на файл
  * @return возвращает 0 в случае успеха или код ошибки
  */
-static int readBmpFileHeader(FILE *stream, FILEHEADER* dst);
+int readBmpFileHeader(FILE *stream, FILEHEADER* dst);
 
 /**
  * @brief fillBmpFileHeader заполняет структуру filheader исходя из харакатеристик изображения
  * @param img указатель на изображение
  * @param header указатель на заполняемую структуру
  */
-static void fillBmpFileHeader(const ByteImage *img, FILEHEADER* header);
+void fillBmpFileHeader(const ByteImage *img, FILEHEADER* header);
 
 /**
  * @brief readBmpInfoHeader чтение струткруы InfoHeader из файла
@@ -64,14 +64,14 @@ static void fillBmpFileHeader(const ByteImage *img, FILEHEADER* header);
  * @param stream указатель на файл
  * @return возвращает 0 в случае успеха или код ошибки
  */
-static int readBmpInfoHeader(FILE* stream, INFOHEADER* dst);
+int readBmpInfoHeader(FILE* stream, INFOHEADER* dst);
 
 /**
  * @brief fillBmpInfoHeader заполняет структуру infoheader исходя из харакатеристик изображения
  * @param img указатель на изображение
  * @param header указатель на заполняемую структуру
  */
-static void fillBmpInfoHeader(const ByteImage* img, INFOHEADER* header);
+void fillBmpInfoHeader(const ByteImage* img, INFOHEADER* header);
 
 /**
  * @brief readBmpPixelArray Чтение пикселей изображения
@@ -82,7 +82,7 @@ static void fillBmpInfoHeader(const ByteImage* img, INFOHEADER* header);
  * @param stream указатель на файл
  * @param dst указатель на массив, куда запишется результат чтения
  */
-static void readBmpPixelArray(size_t width, size_t height,
+void readBmpPixelArray(size_t width, size_t height,
                        uint8_t bytesOnPixel, size_t padding,
                        FILE *stream, uint8_t* dst);
 
@@ -91,7 +91,7 @@ static void readBmpPixelArray(size_t width, size_t height,
  * @param image сохраняемого изображение
  * @param stream указатель на файл, в который выполняется сохранение
  */
-static void saveBmpHeader(const ByteImage *image, FILE *stream);
+void saveBmpHeader(const ByteImage *image, FILE *stream);
 
 /**
  * @brief readBmpPixelArray Чтение пикселей изображения
@@ -102,7 +102,7 @@ static void saveBmpHeader(const ByteImage *image, FILE *stream);
  * @param padding смещение в конце строки
  * @param stream указатель на файл
  */
-static void saveBmpPixelArray(const ByteImage *image, FILE* stream);
+void saveBmpPixelArray(const ByteImage *image, FILE* stream);
 
 /**
  * @brief readBmpImage чтение Bmp изображения

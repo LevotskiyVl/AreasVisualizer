@@ -48,7 +48,6 @@ typedef struct ByteImage_{
  * @return 0 в случае успеха, иначе код ошибки
  */
 int fillByteImageHeader(uint16_t width, uint16_t height, uint8_t numOfChannels, ByteImage* image);
-
 /**
  * @brief createByteImageHeader создаёт ByteImage без выделения памяти под изображение.
  * Вместо этого в качестве изображения используется data
