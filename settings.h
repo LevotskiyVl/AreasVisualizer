@@ -20,4 +20,6 @@
 #define MM_MORPH_HEIGHT 3
 #define NESSTINGS_OFFSET_FOR_MOTION 3
 
+//Настройки для RLE-сегментации
+#define MAX_FULL_HD_OBJTS 518400
 #endif // SETTINGS_H

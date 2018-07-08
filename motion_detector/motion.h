@@ -35,9 +35,12 @@ typedef struct MotionAreaArray_{
     uint16_t numberOfElements;
 } MotionAreaArray;
 
+int initMovementDetector(const ByteImage* sourceImage, MotionDetectorSettings* settings);
+void releaseMovementDetector();
+
 MotionAreaArray* createMotionAreaArray(uint16_t numberOfElements);
 void releaseMotionAreaArray(MotionAreaArray**);
-int motionDetector(const ByteImage* image, MotionAreaArray*);
+int motionDetector(const ByteImage* image, MotionAreaArray** motionAreasArray);
 
 void fillMotionSettingsWithDefaultValues(MotionDetectorSettings* motionArea);
 
@@ -53,6 +56,8 @@ bool checkNesting(MotionArea* motionArea, MotionAreaArray* areas,
                   const uint8_t* areasForDeleting, const MotionDetectorSettings *settings);
 void fillFiltredMotionAreaArray(const MotionAreaArray* motionAreasArray,
                                 const uint8_t* areasForDeleting, MotionAreaArray* resultArray);
+
+void scalingMotionAreas(MotionAreaArray* areas, const MotionDetectorSettings* settings);
 
 
 #endif //MOTION_H

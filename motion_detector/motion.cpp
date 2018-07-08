@@ -1,9 +1,9 @@
-#include "motion.h"
-#include "image_transofrms/transofrms.h"
 #include <string.h>
+
+#include "motion.h"
 #include "settings.h"
-
-
+#include "image_transofrms/transofrms.h"
+#include "Segmentation/RLE_segmentation.h"
 
 struct GlobalVariables{
     ByteImage reducedImage;
@@ -21,6 +21,7 @@ static GlobalVariables globalVariables;
 
 int motionDetector(const ByteImage* image, MotionAreaArray** motionAreasArray)
 {
+    *motionAreasArray = NULL;
     if (image == NULL) return NULL_PTR_ERROR;
     if (image->width != globalVariables.backgroundModel.width ||
             image->height != globalVariables.backgroundModel.height) {
@@ -49,12 +50,28 @@ int motionDetector(const ByteImage* image, MotionAreaArray** motionAreasArray)
     initByteImage(mapWidth, mapHeight, 1, &map);
 
     createMotionMap(histogram, settings, &map);
-    //TODO: маркировка карты двжиеня
-    //TODO: преобразование результатов маркировки в MotionAreaArray
-    *motionAreasArray = motionFilter(motionFrames, settings);
-    //TODO: масштабирование рамок к оригинальному изображению
-    return 0;
 
+    SegmentedZonesArray* segmentedZones = NULL;
+    error = RleSegmentation(&map, CONNECTION_8, segmentedZones);
+
+    releaseByteImage(&map);
+    if (error) {
+        return error;
+    }
+    if (segmentedZones == NULL) {
+        return 0;
+    }
+
+    MotionAreaArray* motionFrames = segmentedZonesToMotionAreas(segmentedZones);
+    releaseSegmentedZoneArray(&segmentedZones);
+    if (motionFrames == NULL) {
+        return 0;
+    }
+
+    *motionAreasArray = motionFilter(motionFrames, settings);
+    scalingMotionAreas(*motionAreasArray, settings);
+
+    return 0;
 }
 
 int initMovementDetector(const ByteImage* sourceImage, MotionDetectorSettings* settings)
@@ -114,7 +131,8 @@ int initMovementDetector(const ByteImage* sourceImage, MotionDetectorSettings* s
     return 0;
 }
 
-void release_movement(){
+void releaseMovementDetector()
+{
     releaseByteImage (&globalVariables.backgroundModel);
     releaseByteImage (&globalVariables.gaussImage);
     releaseByteImage (&globalVariables.reducedImage);
@@ -297,6 +315,19 @@ uint16_t calculateHistCell(const ByteImage* image, const MotionDetectorSettings*
     return motionPixelsCntr;
 }
 
+void scalingMotionAreas(MotionAreaArray* areas, const MotionDetectorSettings* settings)
+{
+    uint16_t scaleXCoeff = settings->reduceStepX * settings->gridMaskSize;
+    uint16_t scaleYCoeff = settings->reduceStepX * settings->gridMaskSize;
+    for (int i = 0; i < areas->numberOfElements; i++) {
+        Rect* rect = areas->motionAreas[i].MovementRect;
+        rect->x *= scaleXCoeff;
+        rect->y *= scaleYCoeff;
+        rect->width *= scaleXCoeff;
+        rect->height *= scaleYCoeff;
+    }
+}
+
 MotionAreaArray* createMotionAreaArray(uint16_t numberOfElements) {
     if (numberOfElements == 0) {
         return NULL;
@@ -327,6 +358,20 @@ void releaseMotionAreaArray(MotionAreaArray** motionAreaArray) {
         (*motionAreaArray)->motionAreas = NULL;
     }
     free(*motionAreaArray);
+    *motionAreaArray = NULL;
 }
 
+MotionAreaArray* segmentedZonesToMotionAreas(const SegmentedZonesArray* segmentedZones)
+{
+    MotionAreaArray* motionAreas = createMotionAreaArray(segmentedZones->numberOfElements);
+    if (motionAreas == NULL) {
+        return NULL;
+    }
 
+    for (size_t i = 0; i < segmentedZones->numberOfElements; i++){
+        motionAreas->motionAreas[i].MovementRect = segmentedZones->zones[i].rect;
+        motionAreas->motionAreas[i].numberOfMotionPixels = segmentedZones->zones[i].size;
+    }
+
+    return motionAreas;
+}
