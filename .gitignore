@@ -33,6 +33,8 @@ build-RefactoringTest-Desktop_Qt_5_5_1_MinGW_32bit-Debug/
 
 build-RefactoringTest-Desktop_Qt_5_5_1_MinGW_32bit-Release/
 
+Recognizer/RefactoringTest/
+
 *.autosave
 
 *.pro
