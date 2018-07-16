@@ -11,6 +11,7 @@
 #include "Recognizer/Recognizer_errors.h"
 #include "Recognizer/Segmentation/RLE_segmentation.h"
 
+
 typedef struct MotionDetectorSettings_{
     uint8_t gridCellSize;
     uint8_t minNumberOfMotionPixelsForZone;

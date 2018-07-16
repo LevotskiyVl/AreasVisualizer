@@ -21,7 +21,7 @@ Recognizer::~Recognizer()
     releaseMovementDetector();
 }
 
-MotionAreaArray* getMotionAreas(const ByteImage* image)
+MotionAreaArray* Recognizer::getMotionAreas(const ByteImage* image)
 {
     MotionAreaArray* result = NULL;
     int error = motionDetector(image, &result);
